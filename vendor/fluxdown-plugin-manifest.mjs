@@ -1,4 +1,4 @@
-// fluxdown-plugin-sdk@0.5.0 manifest validator (generated; do not edit)
+// fluxdown-plugin-sdk@0.5.1 manifest validator (generated; do not edit)
 
 // src/manifest.ts
 var VALID_PERMISSIONS = [
@@ -10,7 +10,8 @@ var VALID_PERMISSIONS = [
   "desktop",
   "background",
   "intercept",
-  "pageScripts"
+  "pageScripts",
+  "archive"
 ];
 var VALID_INTERCEPT_STAGES = [
   "prepare",
@@ -298,7 +299,7 @@ function checkContributes(errors, manifest, files, permissions) {
   const contributes = manifest.contributes;
   if (contributes === void 0 || contributes === null) return;
   if (!isObject(contributes)) return void errors.push("contributes \u987B\u4E3A\u5BF9\u8C61");
-  unknownKeys(errors, "contributes", contributes, ["views", "commands", "sniffRules", "pageScripts"]);
+  unknownKeys(errors, "contributes", contributes, ["views", "commands", "sniffRules", "pageScripts", "archive"]);
   const hasMain = manifest.main !== void 0 && manifest.main !== null;
   const views = contributes.views ?? [];
   if (!Array.isArray(views)) errors.push("contributes.views \u987B\u4E3A\u6570\u7EC4");
@@ -388,6 +389,16 @@ function checkContributes(errors, manifest, files, permissions) {
         errors.push("\u58F0\u660E sniffRules \u65F6 permissions \u5FC5\u987B\u5305\u542B browserRules");
       }
       if (!inPackage(files, rules)) errors.push(`\u5305\u5185\u7F3A\u5C11\u6587\u4EF6 '${rules}'`);
+    }
+  }
+  const archive = contributes.archive;
+  if (archive !== void 0 && archive !== null) {
+    if (typeof archive !== "string" || !isSafeRelativePath(archive)) {
+      errors.push(`archive \u8DEF\u5F84 '${String(archive)}' \u975E\u6CD5`);
+    } else {
+      if (!hasExtension(archive, [".js"])) errors.push(`archive '${archive}' \u6269\u5C55\u540D\u987B\u4E3A .js`);
+      if (!hasPermission(permissions, "archive")) errors.push("\u58F0\u660E archive \u65F6 permissions \u5FC5\u987B\u5305\u542B archive");
+      if (!inPackage(files, archive)) errors.push(`\u5305\u5185\u7F3A\u5C11\u6587\u4EF6 '${archive}'`);
     }
   }
   checkPageScripts(errors, contributes.pageScripts, files, permissions);
@@ -662,7 +673,7 @@ function validateManifest(manifest, files, options = {}) {
 function riskOf(manifest) {
   const permissions = manifest.permissions ?? [];
   if (permissions.includes("desktop") || permissions.includes("pageScripts")) return "full";
-  const elevated = ["ffmpeg", "ytdlp", "auth", "tasks", "browserRules", "background", "intercept"];
+  const elevated = ["ffmpeg", "ytdlp", "auth", "tasks", "browserRules", "background", "intercept", "archive"];
   return permissions.some((p) => elevated.includes(p)) ? "elevated" : "standard";
 }
 function networkHostsOf(manifest) {
@@ -696,6 +707,7 @@ function packageFilesOf(manifest) {
         }
       }
     }
+    if (typeof contributes.archive === "string") files.push(contributes.archive);
   }
   return files;
 }
@@ -816,6 +828,7 @@ function reviewOf(manifest) {
   return {
     permissions: stringArray(manifest.permissions) ? [...manifest.permissions] : [],
     risk: riskOf(manifest),
+    archiveEntry: typeof contributes.archive === "string" ? contributes.archive : null,
     networkHosts: networkHostsOf(manifest),
     downloadUrls: sortedUnique([...resolvers.flatMap(matchUrls), ...matchUrls(manifest.hooks), ...matchUrls(manifest.interceptors)]),
     pageScriptMatches: sortedUnique(pageScripts.flatMap((s) => isObject(s) && stringArray(s.matches) ? s.matches : []))
